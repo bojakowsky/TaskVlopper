@@ -9,50 +9,71 @@ using TaskVlopper.Base.Logic;
 using TaskVlopper.Base.Repository;
 using TaskVlopper.Models;
 using TaskVlopper.ServiceLocator;
+using TaskVlopper.Base.Model;
+using TaskVlopper.Repository.Base;
 
 namespace TaskVlopper.Controllers
 {
     public class ProjectController : Controller
     {
+        static IUnityContainer container = UnityConfig.GetConfiguredContainer();
+        static IProjectLogic logic = container.Resolve<IProjectLogic>();
+
         // GET: Project
         [HttpGet]
         public ActionResult Index()
         {
-            if (User.Identity.IsAuthenticated)
+            try
             {
-                using(IUnityContainer container = UnityConfig.GetConfiguredContainer())
+                if (User.Identity.IsAuthenticated)
                 {
-                    var repository = container.Resolve<IProjectsRepository>();
-                    var viewModel = new ProjectsViewModel(repository.GetAll().ToList());
+
+                    var model = logic.GetAllProjectsForCurrentUser(User.Identity.Name);
+                    var viewModel = new ProjectsViewModel(model.ToList());
 
                     return Json(viewModel, JsonRequestBehavior.AllowGet);
                 }
+                Response.StatusCode = (int)HttpCodeEnum.Forbidden;
+                return View("Error");
             }
-            Response.StatusCode = 403;
-            return View("Error");
+            catch (Exception ex)
+            {
+                Logger.LogException(ex.Message);
+                Response.StatusCode = (int)HttpCodeEnum.InternalServerError;
+                return View("Error");
+            }
         }
 
         // GET: Project/Details/5
         public ActionResult Details(int id)
         {
-            if (User.Identity.IsAuthenticated)
+            try
             {
-                using (IUnityContainer container = UnityConfig.GetConfiguredContainer())
+                if (User.Identity.IsAuthenticated)
                 {
-                    var repository = container.Resolve<IProjectsRepository>();
-                    var viewModel = new ProjectViewModel(repository.GetAll().ToList().Find(p => p.ID == id));
-
+                    var viewModel = new ProjectViewModel(logic.HandleProjectGet(id));
                     return Json(viewModel, JsonRequestBehavior.AllowGet);
                 }
+                Response.StatusCode = (int)HttpCodeEnum.Forbidden;
+                return View("Error");
             }
-            Response.StatusCode = 403;
-            return View("Error");
+            catch (Exception ex)
+            {
+                Logger.LogException(ex.Message);
+                Response.StatusCode = (int)HttpCodeEnum.InternalServerError;
+                return View("Error");
+            }
         }
 
         // GET: Project/Create
         public ActionResult Create()
         {
-            return Json(HttpNotFound());
+            if (User.Identity.IsAuthenticated)
+            {
+                return View();
+            }
+            Response.StatusCode = (int)HttpCodeEnum.Forbidden;
+            return View("Error");
         }
 
         // POST: Project/Create
@@ -61,18 +82,42 @@ namespace TaskVlopper.Controllers
         {
             try
             {
-                return RedirectToAction("Index");
+                if (User.Identity.IsAuthenticated)
+                {
+                    logic.HandleProjectAdd(collection, User.Identity.Name);
+
+                    return Json(JsonHelpers.HttpMessage(HttpCodeEnum.Created, "Project successfully created!"), JsonRequestBehavior.AllowGet);
+                }
+                Response.StatusCode = (int)HttpCodeEnum.Forbidden;
+                return View("Error");
             }
-            catch
+            catch (Exception ex)
             {
-                return Json(HttpNotFound());
+                Logger.LogException(ex.Message);
+                Response.StatusCode = (int)HttpCodeEnum.InternalServerError;
+                return View("Error");
             }
         }
 
         // GET: Project/Edit/5
         public ActionResult Edit(int id)
         {
-            return Json(HttpNotFound());
+            try
+            {
+                if (User.Identity.IsAuthenticated)
+                {
+                    var viewmodel = new ProjectViewModel(logic.HandleProjectGet(id));
+                    return PartialView(viewmodel);
+                }
+                Response.StatusCode = (int)HttpCodeEnum.Forbidden;
+                return View("Error");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogException(ex.Message);
+                Response.StatusCode = (int)HttpCodeEnum.InternalServerError;
+                return View("Error");
+            }
         }
 
         // POST: Project/Edit/5
@@ -81,18 +126,41 @@ namespace TaskVlopper.Controllers
         {
             try
             {
-                return RedirectToAction("Index");
+                if (User.Identity.IsAuthenticated)
+                {
+                    logic.HandleProjectEdit(collection, id);
+                    return Json(JsonHelpers.HttpMessage(HttpCodeEnum.Accepted, "Project successfully updated!"), JsonRequestBehavior.AllowGet);
+                }
+                Response.StatusCode = (int)HttpCodeEnum.Forbidden;
+                return View("Error");
             }
-            catch
+            catch (Exception ex)
             {
-                return Json(HttpNotFound());
+                Logger.LogException(ex.Message);
+                Response.StatusCode = (int)HttpCodeEnum.InternalServerError;
+                return View("Error");
             }
         }
 
         // GET: Project/Delete/5
         public ActionResult Delete(int id)
         {
-            return Json(HttpNotFound());
+            try
+            {
+                if (User.Identity.IsAuthenticated)
+                {
+                    var viewmodel = logic.HandleProjectGet(id);
+                    return View(viewmodel);
+                }
+                Response.StatusCode = (int)HttpCodeEnum.Forbidden;
+                return View("Error");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogException(ex.Message);
+                Response.StatusCode = (int)HttpCodeEnum.InternalServerError;
+                return View("Error");
+            }
         }
 
         // POST: Project/Delete/5
@@ -101,11 +169,19 @@ namespace TaskVlopper.Controllers
         {
             try
             {
-                return RedirectToAction("Index");
+                if (User.Identity.IsAuthenticated)
+                {
+                    logic.HandleProjectDelete(id, User.Identity.Name);
+                    return Json(JsonHelpers.HttpMessage(HttpCodeEnum.OK, "Project successfully removed!"), JsonRequestBehavior.AllowGet);
+                }
+                Response.StatusCode = (int)HttpCodeEnum.Forbidden;
+                return View("Error");
             }
-            catch
+            catch (Exception ex)
             {
-                return Json(HttpNotFound());
+                Logger.LogException(ex.Message);
+                Response.StatusCode = (int)HttpCodeEnum.InternalServerError;
+                return View("Error");
             }
         }
     }
